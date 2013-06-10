@@ -24,48 +24,70 @@
 
 ;;; Code:
 
+(require 'ert-expectations)
+
 ;;
 ;; jump
 ;;
-(defun sstdd-cmd-toggle-test-pair ()
+(defun sstdd-cmd-toggle-testing-pair ()
   (interactive)
-  (sstdd-toggle-test-pair (buffer-file-name)))
+  (sstdd-toggle-testing-pair (buffer-file-name)))
 
-(defun sstdd-toggle-test-pair (filename)
-  (cond ((sstdd-implemented-code-file-p filename)
-         (sstdd-jump-test-code-file))
-        ((sstdd-test-code-file-p filename)
-         (sstdd-jump-implemented-code-file))))
+(defun sstdd-toggle-testing-pair (file-name)
+  (cond ((sstdd-impl-code-file-p file-name)
+         (sstdd-jump-into-test-code-file file-name))
+        ((sstdd-test-code-file-p file-name)
+         (sstdd-jump-into-impl-code-file file-name))))
 
-(defun sstdd-implemented-code-file-p (filename)
+(defun sstdd-impl-code-file-p (filename)
   (not (sstdd-test-code-file-p filename)))
 
 (defun sstdd-test-code-file-p (filename)
   (not (eq nil (string-match "[^/]+?UnitSpec.scala$" filename))))
 
-(defun sstdd-jump-test-code-file ()
-  (find-file
-   (sstdd-to-test-code-file-name
-    (sstdd-to-test-code-file-path (buffer-file-name)))))
+(dont-compile
+  (when (fboundp 'expectations)
+    (expectations
+      (expect t
+        (sstdd-impl-code-file-p
+         "proj/src/main/scala/aaa/bbb/Ccc.scala"))
+      (expect nil
+        (sstdd-impl-code-file-p
+         "proj/src/test/scala/aaa/bbb/CccUnitSpec.scala"))
+      (expect nil
+        (sstdd-test-code-file-p
+         "proj/src/main/scala/aaa/bbb/Ccc.scala"))
+      (expect t
+        (sstdd-test-code-file-p
+         "proj/src/main/scala/aaa/bbb/CccUnitSpec.scala")))))
 
-(defun sstdd-jump-implemented-code-file ()
-  (find-file
-   (sstdd-to-implemented-code-file-name
-    (sstdd-to-implemeted-code-file-path (buffer-file-name)))))
-
-(defun sstdd-to-test-code-file-path (filename)
-  (replace-regexp-in-string "/src/main/scala" "/src/test/scala" filename))
-
-(defun sstdd-to-implemeted-code-file-path (filename)
-  (replace-regexp-in-string "/src/test/scala" "/src/main/scala" filename))
-
-(defun sstdd-to-test-code-file-name (filename)
+(defun sstdd-convert-impl-code-path-to-test-code-path
+  (impl-code-file-path)
   (replace-regexp-in-string
-   "\\([^/]+?\\).scala$" "\\1UnitSpec\.scala" filename))
+   "/src/main/scala/\\(.*\\)/\\([^/]+?\\)\.scala"
+   "/src/test/scala/\\1/\\2UnitSpec.scala" impl-code-file-path))
 
-(defun sstdd-to-implemented-code-file-name (filename)
+(defun sstdd-convert-test-code-path-to-impl-code-path
+  (test-code-file-path)
   (replace-regexp-in-string
-   "\\([^/]+?\\)UnitSpec.scala$" "\\1\.scala" filename))
+   "/src/test/scala/\\(.*\\)/\\([^/]+?\\)UnitSpec\.scala"
+   "/src/main/scala/\\1/\\2\.scala" test-code-file-path))
+
+(dont-compile
+  (when (fboundp 'expectations)
+    (expectations
+      (expect "proj/src/test/scala/aaa/bbb/MyUnitSpec.scala"
+        (sstdd-convert-impl-code-path-to-test-code-path
+         "proj/src/main/scala/aaa/bbb/My.scala"))
+      (expect "proj/src/main/scala/aaa/bbb/Ccc.scala"
+        (sstdd-convert-test-code-path-to-impl-code-path
+         "proj/src/test/scala/aaa/bbb/CccUnitSpec.scala")))))
+
+(defun sstdd-jump-into-test-code-file (file-name)
+  (find-file (sstdd-convert-impl-code-path-to-test-code-path file-name)))
+
+(defun sstdd-jump-into-impl-code-file (file-name)
+  (find-file (sstdd-convert-test-code-path-to-impl-code-path file-name)))
 
 ;;
 ;; run
